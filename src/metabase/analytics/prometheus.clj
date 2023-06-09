@@ -6,13 +6,12 @@
   Api is quite simple: [[setup!]] and [[shutdown!]]. After that you can retrieve metrics from
   http://localhost:<prometheus-server-port>/metrics."
   (:require
+   [clojure.java.jmx :as jmx]
    [iapetos.collector :as collector]
    [iapetos.collector.ring :as collector.ring]
    [iapetos.core :as prometheus]
-   [metabase.email :as email]
    [metabase.models.setting :as setting :refer [defsetting]]
    [metabase.server :as server]
-   [metabase.troubleshooting :as troubleshooting]
    [metabase.util.i18n :refer [deferred-trs trs]]
    [metabase.util.log :as log]
    [potemkin :as p]
@@ -23,6 +22,7 @@
    (io.prometheus.client.hotspot GarbageCollectorExports MemoryPoolsExports StandardExports ThreadExports)
    (io.prometheus.client.jetty JettyStatisticsCollector)
    (java.util ArrayList List)
+   (javax.management ObjectName)
    (org.eclipse.jetty.server Server)))
 
 (set! *warn-on-reflection* true)
@@ -76,7 +76,7 @@
 ;;; Collectors
 
 (defn c3p0-stats
-  "Takes `raw-stats` from [[metabase.troubleshooting/connection-pool-info]] and groups by each property type rather than each database.
+  "Takes `raw-stats` from [[connection-pool-info]] and groups by each property type rather than each database.
   {\"metabase-postgres-app-db\" {:numConnections 15,
                                  :numIdleConnections 15,
                                  :numBusyConnections 0,
@@ -143,11 +143,21 @@
                        raw-label))))
     arr))
 
+(defn- conn-pool-bean-diag-info [acc ^ObjectName jmx-bean]
+  (let [bean-id   (.getCanonicalName jmx-bean)
+        props     [:numConnections :numIdleConnections :numBusyConnections
+                   :minPoolSize :maxPoolSize :numThreadsAwaitingCheckoutDefaultUser]]
+    (assoc acc (jmx/read bean-id :dataSourceName) (jmx/read bean-id props))))
+
+(defn connection-pool-info
+  "Builds a map of info about the current c3p0 connection pools managed by this Metabase instance."
+  []
+  (reduce conn-pool-bean-diag-info {} (jmx/mbean-names "com.mchange.v2.c3p0:type=PooledDataSource,*")))
+
 (def c3p0-collector
   "c3p0 collector delay"
   (letfn [(collect-metrics []
-            (-> (troubleshooting/connection-pool-info)
-                :connection-pools
+            (-> (connection-pool-info)
                 c3p0-stats
                 stats->prometheus))]
     (delay
@@ -193,7 +203,11 @@
     (apply prometheus/register registry
            (concat (jvm-collectors)
                    (jetty-collectors)
-                   [@c3p0-collector]))))
+                   [@c3p0-collector]
+                   [(prometheus/counter :metabase-email-messages
+                                        {:description (trs "Number of emails sent.")})
+                    (prometheus/counter :metabase-email-message-errors
+                                        {:description (trs "Number of errors when sending emails.")})]))))
 
 (defn- start-web-server!
   "Start the prometheus web-server. If [[prometheus-server-port]] is not set it will throw."
@@ -221,7 +235,6 @@
       (locking #'system
         (when-not system
           (let [sys (make-prometheus-system port "metabase-registry")]
-            (email/setup-metrics! (.-registry ^PrometheusSystem sys))
             (alter-var-root #'system (constantly sys))))))))
 
 (defn shutdown!
@@ -231,11 +244,17 @@
     (locking #'system
       (when system
         (try (stop-web-server system)
-             (email/shutdown-metrics!)
+             (prometheus/clear (.-registry system))
              (alter-var-root #'system (constantly nil))
              (log/info (trs "Prometheus web-server shut down"))
              (catch Exception e
                (log/warn e (trs "Error stopping prometheus web-server"))))))))
+
+(defn inc
+  "Call iapetos.core/inc on the metric in the global registry,
+   if it has already been initialized and the metric registered."
+  [metric]
+  (some-> system :registry metric prometheus/inc))
 
 (comment
   (require 'iapetos.export)

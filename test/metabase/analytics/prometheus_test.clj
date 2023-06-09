@@ -6,8 +6,7 @@
    [clojure.test :refer :all]
    [iapetos.registry :as registry]
    [metabase.analytics.prometheus :as prometheus]
-   [metabase.test.fixtures :as fixtures]
-   [metabase.troubleshooting :as troubleshooting])
+   [metabase.test.fixtures :as fixtures])
   (:import
    (io.prometheus.client Collector GaugeMetricFamily)
    (org.eclipse.jetty.server Server)))
@@ -128,7 +127,7 @@
                                                    :namespace "metabase_database"}
                                          nil)]
         (is c3p0-collector "c3p0 stats not found"))))
-  (testing "Registry has an entry for each database in [[troubleshooting/connection-pool-info]]"
+  (testing "Registry has an entry for each database in [[prometheus/connection-pool-info]]"
     (with-prometheus-system [_ system]
       (let [registry       (.registry system)
             c3p0-collector (registry/get registry {:name      "c3p0_stats"
@@ -138,12 +137,12 @@
             measurements   (.collect ^Collector c3p0-collector)
             _              (is (pos? (count measurements))
                                "No measurements taken")]
-        (is (= (count (:connection-pools (troubleshooting/connection-pool-info)))
+        (is (= (count (prometheus/connection-pool-info))
                (count (.samples ^GaugeMetricFamily (first measurements))))
             "Expected one entry per database for each measurement"))))
   (testing "Registry includes c3p0 stats"
     (with-prometheus-system [port _]
-      (let [[db-name values] (first (:connection-pools (troubleshooting/connection-pool-info)))
+      (let [[db-name values] (first (prometheus/connection-pool-info))
             tag-name         (comp :label #'prometheus/label-translation)
             expected-lines   (set (for [[tag value] values]
                                     (format "%s{database=\"%s\",} %s"
@@ -152,3 +151,15 @@
                                    (metric-lines port))]
         (is (seq (set/intersection expected-lines actual-lines))
             "Registry does not have c3p0 metrics in it")))))
+
+(deftest inc-server-test
+  (testing "inc has no effect if system is not setup"
+    (is (not (thrown? (prometheus/inc :metabase-email-messages)))))
+  (testing "inc has no effect when called with unknown metric"
+    (with-prometheus-system [_ system]
+      (is (not (thrown? (prometheus/inc :unknown-metric))))
+      (is (= 0 (.getSampleValue (.-registry system) "unknown_metric_total")))))
+  (testing "inc is recorded for known metrics"
+    (with-prometheus-system [_ system]
+      (is (not (thrown? (prometheus/inc :metabase-email-messages))))
+      (is (< 0 (.getSampleValue (.-registry system) "metabase_email_messages_total"))))))
