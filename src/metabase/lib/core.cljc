@@ -10,6 +10,7 @@
    [metabase.lib.card :as lib.card]
    [metabase.lib.column-group :as lib.column-group]
    [metabase.lib.dev :as lib.dev]
+   [metabase.lib.drill-thru :as lib.drill-thru]
    [metabase.lib.expression :as lib.expression]
    [metabase.lib.field :as lib.field]
    [metabase.lib.filter :as lib.filter]
@@ -94,6 +95,11 @@
    query-for-table-name
    table
    ref-lookup]
+  [lib.drill-thru
+   available-drill-thrus
+   drill-thru
+   pivot-columns-for-type
+   pivot-types]
   [lib.expression
    expression
    expressions

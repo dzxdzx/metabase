@@ -61,6 +61,8 @@
   (segment  [_this segment-id] (get-in-cache-or-fetch cache [:metadata/segment segment-id]  #(lib.metadata.protocols/segment  metadata-provider segment-id)))
   (tables   [_this]            (get-in-cache-or-fetch cache [::database-tables]             #(lib.metadata.protocols/tables   metadata-provider)))
   (fields   [_this table-id]   (get-in-cache-or-fetch cache [::table-fields table-id]       #(lib.metadata.protocols/fields   metadata-provider table-id)))
+  (setting  [_this setting]    (lib.metadata.protocols/setting metadata-provider setting))
+
 
   lib.metadata.protocols/CachedMetadataProvider
   (cached-database [_this]                           (get-in-cache    cache [:metadata/database]))
