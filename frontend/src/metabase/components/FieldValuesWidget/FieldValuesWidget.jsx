@@ -41,6 +41,7 @@ import {
 } from "metabase-lib/parameters/utils/parameter-source";
 
 const MAX_SEARCH_RESULTS = 100;
+const FIELD_TITLE_MAX_LENGTH = 20;
 
 const fieldValuesWidgetPropTypes = {
   addRemappings: PropTypes.func,
@@ -474,18 +475,22 @@ const LoadingState = () => (
 );
 
 const NoMatchState = ({ fields }) => {
-  if (fields.length > 1) {
-    // if there is more than one field, don't name them
-    return <OptionsMessage message={t`No matching result`} />;
+  if (fields.length === 1) {
+    const [{ display_name }] = fields;
+
+    if (display_name.length <= FIELD_TITLE_MAX_LENGTH) {
+      return (
+        <OptionsMessage
+          message={jt`No matching ${(
+            <strong>&nbsp;{display_name}&nbsp;</strong>
+          )} found.`}
+        />
+      );
+    }
   }
-  const [{ display_name }] = fields;
-  return (
-    <OptionsMessage
-      message={jt`No matching ${(
-        <strong>&nbsp;{display_name}&nbsp;</strong>
-      )} found.`}
-    />
-  );
+
+  // if there is more than one field, don't name them
+  return <OptionsMessage message={t`No matching result`} />;
 };
 
 const EveryOptionState = () => (

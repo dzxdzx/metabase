@@ -1,6 +1,13 @@
 import "mutationobserver-shim";
 
-import { renderWithProviders, screen, waitFor } from "__support__/ui";
+import userEvent from "@testing-library/user-event";
+import fetchMock from "fetch-mock";
+import {
+  getBrokenUpTextMatcher,
+  renderWithProviders,
+  screen,
+  waitFor,
+} from "__support__/ui";
 import { createMockEntitiesState } from "__support__/store";
 
 import { checkNotNull } from "metabase/core/utils/types";
@@ -25,6 +32,7 @@ import {
   REVIEWS_ID,
   PRODUCT_CATEGORY_VALUES,
   PEOPLE_SOURCE_VALUES,
+  createPeoplePasswordField,
 } from "metabase-types/api/mocks/presets";
 import { createMockState } from "metabase-types/store/mocks";
 
@@ -34,6 +42,7 @@ const STRING_PK_FIELD_ID = 101;
 const SEARCHABLE_FK_FIELD_ID = 102;
 const LISTABLE_FIELD_WITH_MANY_VALUES_ID = 103;
 const EXPRESSION_FIELD_ID = ["field", "CC", { "base-type": "type/Text" }];
+const NBSP = "\u00a0";
 
 const database = createSampleDatabase({
   tables: [
@@ -94,6 +103,28 @@ const state = createMockState({
 });
 
 const metadata = getMetadata(state);
+
+function getMetadataStateWithPasswordField(fieldOpts = {}) {
+  const state = createMockState({
+    entities: createMockEntitiesState({
+      databases: [
+        createSampleDatabase({
+          tables: [
+            createPeopleTable({
+              fields: [
+                createPeoplePasswordField({
+                  ...fieldOpts,
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+    }),
+  });
+
+  return getMetadata(state);
+}
 
 async function setup({ fields, values, ...props }) {
   const fetchFieldValues = jest.fn();
@@ -425,6 +456,77 @@ describe("FieldValuesWidget", () => {
       expect(screen.getByText(LISTABLE_PK_FIELD_VALUE)).toBeInTheDocument();
       expect(fetchFieldValues).toHaveBeenCalledWith(LISTABLE_PK_FIELD_ID);
       expect(fetchFieldValues).not.toHaveBeenCalledWith(EXPRESSION_FIELD_ID);
+    });
+  });
+
+  describe("NoMatchState", () => {
+    it("should display field title if it is short", async () => {
+      const metadata = getMetadataStateWithPasswordField({
+        has_field_values: "search",
+      });
+      const fieldId = PEOPLE.PASSWORD;
+      const field = metadata.field(fieldId);
+      const displayName = field.display_name; // "Password"
+      const searchValue = "somerandomvalue";
+
+      fetchMock.get(
+        `http://localhost/api/field/${fieldId}/search/${fieldId}?value=${searchValue}&limit=100`,
+        {
+          body: [],
+        },
+      );
+
+      await setup({
+        fields: [field],
+        multi: true,
+        disablePKRemappingForSearch: true,
+      });
+
+      userEvent.type(
+        screen.getByPlaceholderText(`Search by ${displayName}`),
+        searchValue,
+      );
+
+      expect(
+        await screen.findByText(
+          getBrokenUpTextMatcher(
+            `No matching ${NBSP}${displayName}${NBSP} found.`,
+          ),
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("should not display field title if it is too long (> 20 chars)", async () => {
+      const metadata = getMetadataStateWithPasswordField({
+        display_name:
+          "This is the salted password of the user. It should not be visible",
+        has_field_values: "search",
+      });
+
+      const fieldId = PEOPLE.PASSWORD;
+      const field = metadata.field(fieldId);
+      const displayName = field.display_name;
+      const searchValue = "somerandomvalue";
+
+      fetchMock.get(
+        `http://localhost/api/field/${fieldId}/search/${fieldId}?value=${searchValue}&limit=100`,
+        {
+          body: [],
+        },
+      );
+
+      await setup({
+        fields: [field],
+        multi: true,
+        disablePKRemappingForSearch: true,
+      });
+
+      userEvent.type(
+        screen.getByPlaceholderText(`Search by ${displayName}`),
+        searchValue,
+      );
+
+      expect(await screen.findByText("No matching result")).toBeInTheDocument();
     });
   });
 });

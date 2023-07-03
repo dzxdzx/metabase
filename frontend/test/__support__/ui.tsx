@@ -178,7 +178,14 @@ export function queryIcon(name: string, role: ByRoleMatcher = "img") {
  * screen.getByText(getBrokenUpTextMatcher("my text with a styled word"))
  */
 export function getBrokenUpTextMatcher(textToFind: string): MatcherFunction {
-  return (content, element) => element?.textContent === textToFind;
+  return (content, element) => {
+    const hasText = (node: Element | null | undefined) =>
+      node?.textContent === textToFind;
+    const childrenDontHaveText = element
+      ? Array.from(element.children).every(child => !hasText(child))
+      : true;
+    return hasText(element) && childrenDontHaveText;
+  };
 }
 
 export * from "@testing-library/react";
