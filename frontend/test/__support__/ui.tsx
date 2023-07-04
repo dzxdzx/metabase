@@ -181,10 +181,11 @@ export function getBrokenUpTextMatcher(textToFind: string): MatcherFunction {
   return (content, element) => {
     const hasText = (node: Element | null | undefined) =>
       node?.textContent === textToFind;
-    const childrenDontHaveText = element
+    const childrenDoNotHaveText = element
       ? Array.from(element.children).every(child => !hasText(child))
       : true;
-    return hasText(element) && childrenDontHaveText;
+
+    return hasText(element) && childrenDoNotHaveText;
   };
 }
 

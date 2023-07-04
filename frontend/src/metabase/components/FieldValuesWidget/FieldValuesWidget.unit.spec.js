@@ -11,12 +11,6 @@ import {
 import { createMockEntitiesState } from "__support__/store";
 
 import { checkNotNull } from "metabase/core/utils/types";
-import {
-  FieldValuesWidget,
-  searchField,
-  isSearchable,
-  getValuesMode,
-} from "metabase/components/FieldValuesWidget";
 import { getMetadata } from "metabase/selectors/metadata";
 
 import { createMockField } from "metabase-types/api/mocks";
@@ -35,6 +29,13 @@ import {
   createPeoplePasswordField,
 } from "metabase-types/api/mocks/presets";
 import { createMockState } from "metabase-types/store/mocks";
+
+import { FieldValuesWidget } from "./FieldValuesWidget";
+import {
+  searchField,
+  isSearchable,
+  getValuesMode,
+} from "./FieldValuesWidget.utils";
 
 const LISTABLE_PK_FIELD_ID = 100;
 const LISTABLE_PK_FIELD_VALUE = "1234";
@@ -460,7 +461,7 @@ describe("FieldValuesWidget", () => {
   });
 
   describe("NoMatchState", () => {
-    it("should display field title if it is short", async () => {
+    it("should display field title when no matching results found", async () => {
       const metadata = getMetadataStateWithPasswordField({
         has_field_values: "search",
       });
@@ -494,39 +495,6 @@ describe("FieldValuesWidget", () => {
           ),
         ),
       ).toBeInTheDocument();
-    });
-
-    it("should not display field title if it is too long (> 20 chars)", async () => {
-      const metadata = getMetadataStateWithPasswordField({
-        display_name:
-          "This is the salted password of the user. It should not be visible",
-        has_field_values: "search",
-      });
-
-      const fieldId = PEOPLE.PASSWORD;
-      const field = metadata.field(fieldId);
-      const displayName = field.display_name;
-      const searchValue = "somerandomvalue";
-
-      fetchMock.get(
-        `http://localhost/api/field/${fieldId}/search/${fieldId}?value=${searchValue}&limit=100`,
-        {
-          body: [],
-        },
-      );
-
-      await setup({
-        fields: [field],
-        multi: true,
-        disablePKRemappingForSearch: true,
-      });
-
-      userEvent.type(
-        screen.getByPlaceholderText(`Search by ${displayName}`),
-        searchValue,
-      );
-
-      expect(await screen.findByText("No matching result")).toBeInTheDocument();
     });
   });
 });

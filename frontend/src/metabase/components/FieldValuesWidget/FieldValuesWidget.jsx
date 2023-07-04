@@ -16,7 +16,6 @@ import LoadingSpinner from "metabase/components/LoadingSpinner";
 
 import AutoExpanding from "metabase/hoc/AutoExpanding";
 
-import { MetabaseApi } from "metabase/services";
 import { addRemappings, fetchFieldValues } from "metabase/redux/metadata";
 import { defer } from "metabase/lib/promise";
 import { stripId } from "metabase/lib/formatting";
@@ -32,24 +31,21 @@ import {
   isNumberParameter,
   isStringParameter,
 } from "metabase-lib/parameters/utils/parameter-type";
+import { getSourceType } from "metabase-lib/parameters/utils/parameter-source";
+import { OptionsMessage, StyledEllipsified } from "./FieldValuesWidget.styled";
 import {
-  canListFieldValues,
-  canListParameterValues,
-  canSearchFieldValues,
-  canSearchParameterValues,
-  getSourceType,
-} from "metabase-lib/parameters/utils/parameter-source";
+  dedupeValues,
+  getValuesMode,
+  isSearchable,
+  searchFieldValues,
+  shouldList,
+} from "./FieldValuesWidget.utils";
 
 const MAX_SEARCH_RESULTS = 100;
-const FIELD_TITLE_MAX_LENGTH = 20;
 
 const fieldValuesWidgetPropTypes = {
   addRemappings: PropTypes.func,
   expand: PropTypes.bool,
-};
-
-const optionsMessagePropTypes = {
-  message: PropTypes.string.isRequired,
 };
 
 const mapDispatchToProps = {
@@ -67,30 +63,6 @@ function mapStateToProps(state, { fields = [] }) {
         Fields.selectors.getObject(state, { entityId: field.id }) || field,
     ),
   };
-}
-
-async function searchFieldValues(
-  { fields, value, disablePKRemappingForSearch, maxResults },
-  cancelled,
-) {
-  let options = dedupeValues(
-    await Promise.all(
-      fields.map(field =>
-        MetabaseApi.field_search(
-          {
-            value,
-            fieldId: field.id,
-            searchFieldId: field.searchField(disablePKRemappingForSearch).id,
-            limit: maxResults,
-          },
-          { cancelled },
-        ),
-      ),
-    ),
-  );
-
-  options = options.map(result => [].concat(result));
-  return options;
 }
 
 function getNonVirtualFields(fields) {
@@ -463,11 +435,6 @@ export const FieldValuesWidget = AutoExpanding(FieldValuesWidgetInner);
 
 FieldValuesWidget.propTypes = fieldValuesWidgetPropTypes;
 
-function dedupeValues(valuesList) {
-  const uniqueValueMap = new Map(valuesList.flat().map(o => [o[0], o]));
-  return Array.from(uniqueValueMap.values());
-}
-
 const LoadingState = () => (
   <div className="flex layout-centered align-center" style={{ minHeight: 82 }}>
     <LoadingSpinner size={32} />
@@ -478,18 +445,16 @@ const NoMatchState = ({ fields }) => {
   if (fields.length === 1) {
     const [{ display_name }] = fields;
 
-    if (display_name.length <= FIELD_TITLE_MAX_LENGTH) {
-      return (
-        <OptionsMessage
-          message={jt`No matching ${(
-            <strong>&nbsp;{display_name}&nbsp;</strong>
-          )} found.`}
-        />
-      );
-    }
+    return (
+      <OptionsMessage
+        message={jt`No matching ${(
+          <StyledEllipsified>&nbsp;{display_name}&nbsp;</StyledEllipsified>
+        )} found.`}
+      />
+    );
   }
 
-  // if there is more than one field, don't name them
+  // if there is more than one field or no fields, don't name them
   return <OptionsMessage message={t`No matching result`} />;
 };
 
@@ -498,12 +463,6 @@ const EveryOptionState = () => (
     message={t`Including every option in your filter probably won’t do much…`}
   />
 );
-
-const OptionsMessage = ({ message }) => (
-  <div className="flex layout-centered p4">{message}</div>
-);
-
-OptionsMessage.propTypes = optionsMessagePropTypes;
 
 export default connect(mapStateToProps, mapDispatchToProps)(FieldValuesWidget);
 
@@ -521,16 +480,6 @@ function canUseDashboardEndpoints(dashboard) {
 
 function showRemapping(fields) {
   return fields.length === 1;
-}
-
-function shouldList({ parameter, fields, disableSearch }) {
-  if (disableSearch) {
-    return false;
-  } else {
-    return parameter
-      ? canListParameterValues(parameter)
-      : canListFieldValues(fields);
-  }
 }
 
 function getNonSearchableTokenFieldPlaceholder(firstField, parameter) {
@@ -560,10 +509,6 @@ function getNonSearchableTokenFieldPlaceholder(firstField, parameter) {
 
   // fallback
   return t`Enter some text`;
-}
-
-export function searchField(field, disablePKRemappingForSearch) {
-  return field.searchField(disablePKRemappingForSearch);
 }
 
 function getSearchableTokenFieldPlaceholder(
@@ -615,24 +560,6 @@ function isExtensionOfPreviousSearch(value, lastValue, options, maxResults) {
     value.slice(0, lastValue.length) === lastValue &&
     options.length < maxResults
   );
-}
-
-export function isSearchable({
-  parameter,
-  fields,
-  disableSearch,
-  disablePKRemappingForSearch,
-  valuesMode,
-}) {
-  if (disableSearch) {
-    return false;
-  } else if (valuesMode === "search") {
-    return true;
-  } else if (parameter) {
-    return canSearchParameterValues(parameter, disablePKRemappingForSearch);
-  } else {
-    return canSearchFieldValues(fields, disablePKRemappingForSearch);
-  }
 }
 
 function getTokenFieldPlaceholder({
@@ -743,31 +670,6 @@ function renderValue(fields, formatOptions, value, options) {
       {...options}
     />
   );
-}
-
-export function getValuesMode({
-  parameter,
-  fields,
-  disableSearch,
-  disablePKRemappingForSearch,
-}) {
-  if (
-    isSearchable({
-      parameter,
-      fields,
-      disableSearch,
-      disablePKRemappingForSearch,
-      valuesMode: undefined,
-    })
-  ) {
-    return "search";
-  }
-
-  if (shouldList({ parameter, fields, disableSearch })) {
-    return "list";
-  }
-
-  return "none";
 }
 
 function isNumeric(field, parameter) {
