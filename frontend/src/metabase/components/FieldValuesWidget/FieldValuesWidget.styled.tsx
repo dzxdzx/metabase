@@ -6,7 +6,7 @@ export const StyledEllipsified = styled(Ellipsified)`
   display: inline-block;
 `;
 
-const OptionsMessageContainer = styled.div`
+export const OptionsMessage = styled.div`
   padding: 2rem;
 
   position: relative;
@@ -17,7 +17,3 @@ const OptionsMessageContainer = styled.div`
 
   white-space: nowrap;
 `;
-
-export const OptionsMessage = ({ message }: { message: string }) => (
-  <OptionsMessageContainer>{message}</OptionsMessageContainer>
-);

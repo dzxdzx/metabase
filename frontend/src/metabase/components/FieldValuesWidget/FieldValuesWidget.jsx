@@ -39,7 +39,7 @@ import {
   isSearchable,
   searchFieldValues,
   shouldList,
-} from "./FieldValuesWidget.utils";
+} from "./utils";
 
 const MAX_SEARCH_RESULTS = 100;
 
@@ -446,22 +446,19 @@ const NoMatchState = ({ fields }) => {
     const [{ display_name }] = fields;
 
     return (
-      <OptionsMessage
-        message={jt`No matching ${(
+      <OptionsMessage>
+        {jt`No matching ${(
           <StyledEllipsified>&nbsp;{display_name}&nbsp;</StyledEllipsified>
         )} found.`}
-      />
+      </OptionsMessage>
     );
   }
 
-  // if there is more than one field or no fields, don't name them
-  return <OptionsMessage message={t`No matching result`} />;
+  return <OptionsMessage>{t`No matching result`}</OptionsMessage>;
 };
 
 const EveryOptionState = () => (
-  <OptionsMessage
-    message={t`Including every option in your filter probably won’t do much…`}
-  />
+  <OptionsMessage>{t`Including every option in your filter probably won’t do much…`}</OptionsMessage>
 );
 
 export default connect(mapStateToProps, mapDispatchToProps)(FieldValuesWidget);

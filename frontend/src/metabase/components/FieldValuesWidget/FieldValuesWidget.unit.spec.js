@@ -1,7 +1,6 @@
 import "mutationobserver-shim";
 
 import userEvent from "@testing-library/user-event";
-import fetchMock from "fetch-mock";
 import {
   getBrokenUpTextMatcher,
   renderWithProviders,
@@ -30,12 +29,9 @@ import {
 } from "metabase-types/api/mocks/presets";
 import { createMockState } from "metabase-types/store/mocks";
 
+import { setupFieldSearchValuesEndpoints } from "__support__/server-mocks";
 import { FieldValuesWidget } from "./FieldValuesWidget";
-import {
-  searchField,
-  isSearchable,
-  getValuesMode,
-} from "./FieldValuesWidget.utils";
+import { searchField, isSearchable, getValuesMode } from "./utils";
 
 const LISTABLE_PK_FIELD_ID = 100;
 const LISTABLE_PK_FIELD_VALUE = "1234";
@@ -127,8 +123,12 @@ function getMetadataStateWithPasswordField(fieldOpts = {}) {
   return getMetadata(state);
 }
 
-async function setup({ fields, values, ...props }) {
+async function setup({ fields, values, searchValue, ...props }) {
   const fetchFieldValues = jest.fn();
+
+  fields.forEach(field => {
+    setupFieldSearchValuesEndpoints(field.id, searchValue);
+  });
 
   renderWithProviders(
     <FieldValuesWidget
@@ -461,26 +461,19 @@ describe("FieldValuesWidget", () => {
   });
 
   describe("NoMatchState", () => {
-    it("should display field title when no matching results found", async () => {
+    it("should display field title when one field passed and there are no matching results", async () => {
       const metadata = getMetadataStateWithPasswordField({
         has_field_values: "search",
       });
-      const fieldId = PEOPLE.PASSWORD;
-      const field = metadata.field(fieldId);
+      const field = metadata.field(PEOPLE.PASSWORD);
       const displayName = field.display_name; // "Password"
       const searchValue = "somerandomvalue";
-
-      fetchMock.get(
-        `http://localhost/api/field/${fieldId}/search/${fieldId}?value=${searchValue}&limit=100`,
-        {
-          body: [],
-        },
-      );
 
       await setup({
         fields: [field],
         multi: true,
         disablePKRemappingForSearch: true,
+        searchValue,
       });
 
       userEvent.type(
@@ -495,6 +488,21 @@ describe("FieldValuesWidget", () => {
           ),
         ),
       ).toBeInTheDocument();
+    });
+
+    it("should not display field title when multiple fields passed and no matching results found", async () => {
+      const searchValue = "somerandomvalue";
+
+      await setup({
+        fields: [metadata.field(PEOPLE.CITY), metadata.field(PEOPLE.NAME)],
+        multi: true,
+        disablePKRemappingForSearch: true,
+        searchValue,
+      });
+
+      userEvent.type(screen.getByPlaceholderText("Search"), searchValue);
+
+      expect(await screen.findByText(`No matching result`)).toBeInTheDocument();
     });
   });
 });
