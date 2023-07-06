@@ -2,7 +2,6 @@
 
 import d3 from "d3";
 import { createSelector } from "@reduxjs/toolkit";
-import createCachedSelector from "re-reselect";
 import _ from "underscore";
 import { getIn, merge, updateIn } from "icepick";
 
@@ -315,14 +314,21 @@ export const getLastRunQuestion = createSelector(
     card && metadata && new Question(card, metadata, parameterValues),
 );
 
-export const getQuestion = createSelector(
-  [getMetadata, getCard, getParameterValues, getQueryBuilderMode],
-  (metadata, card, parameterValues, queryBuilderMode) => {
-    if (!metadata || !card) {
+export const getQuestionWithParameters = createSelector(
+  [getCard, getMetadata, getParameterValues],
+  (card, metadata, parameterValues) => {
+    if (!card || !metadata) {
       return;
     }
-    const question = new Question(card, metadata, parameterValues);
-
+    return new Question(card, metadata, parameterValues);
+  },
+);
+export const getQuestion = createSelector(
+  [getQuestionWithParameters, getQueryBuilderMode],
+  (question, queryBuilderMode) => {
+    if (!question) {
+      return;
+    }
     const isEditingModel = queryBuilderMode === "dataset";
     if (isEditingModel) {
       return question.lockDisplay();
@@ -340,14 +346,6 @@ export const getQuestion = createSelector(
       : question;
   },
 );
-
-// This jsdoc keeps the TS typechecker happy.
-// Otherwise TS thinks this `getQuestionFromCard` requires two args.
-/** @type {function(unknown, unknown): Question} */
-export const getQuestionFromCard = createCachedSelector(
-  [getMetadata, (_state, card) => card],
-  (metadata, card) => new Question(card, metadata),
-)((_state, card) => card.id);
 
 function isQuestionEditable(question) {
   return !question?.query().readOnly();
@@ -941,7 +939,11 @@ export const getNativeQueryFn = createSelector(
 );
 
 export const getDashboardId = state => {
-  return state.qb.dashboardId;
+  return state.qb.parentDashboard.dashboardId;
+};
+
+export const getIsEditingInDashboard = state => {
+  return state.qb.parentDashboard.isEditing;
 };
 
 export const getDashboard = state => {
