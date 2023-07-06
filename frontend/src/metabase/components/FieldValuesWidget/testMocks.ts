@@ -68,7 +68,7 @@ const database = createSampleDatabase({
           has_more_values: true,
         }),
         createMockField({
-          id: EXPRESSION_FIELD_ID,
+          id: EXPRESSION_FIELD_ID as any,
           field_ref: ["expression", "CC"],
         }),
       ],
