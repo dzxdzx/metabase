@@ -1,9 +1,7 @@
-import "mutationobserver-shim";
-
 import { renderWithProviders, screen, waitFor } from "__support__/ui";
 
 import { checkNotNull } from "metabase/core/utils/types";
-import { FieldValuesWidgetInner } from "metabase/components/FieldValuesWidget";
+import { FieldValuesWidget } from "metabase/components/FieldValuesWidget";
 
 import {
   ORDERS,
@@ -35,7 +33,7 @@ async function setup({
   }));
 
   renderWithProviders(
-    <FieldValuesWidgetInner
+    <FieldValuesWidget
       value={[]}
       fields={fields as Field[]}
       onChange={jest.fn()}
