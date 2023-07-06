@@ -448,7 +448,7 @@ const NoMatchState = ({ fields }) => {
     return (
       <OptionsMessage>
         {jt`No matching ${(
-          <StyledEllipsified>&nbsp;{display_name}&nbsp;</StyledEllipsified>
+          <StyledEllipsified>{display_name}</StyledEllipsified>
         )} found.`}
       </OptionsMessage>
     );

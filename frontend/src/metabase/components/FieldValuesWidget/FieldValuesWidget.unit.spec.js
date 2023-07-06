@@ -39,7 +39,6 @@ const STRING_PK_FIELD_ID = 101;
 const SEARCHABLE_FK_FIELD_ID = 102;
 const LISTABLE_FIELD_WITH_MANY_VALUES_ID = 103;
 const EXPRESSION_FIELD_ID = ["field", "CC", { "base-type": "type/Text" }];
-const NBSP = "\u00a0";
 
 const database = createSampleDatabase({
   tables: [
@@ -483,9 +482,7 @@ describe("FieldValuesWidget", () => {
 
       expect(
         await screen.findByText(
-          getBrokenUpTextMatcher(
-            `No matching ${NBSP}${displayName}${NBSP} found.`,
-          ),
+          getBrokenUpTextMatcher(`No matching ${displayName} found.`),
         ),
       ).toBeInTheDocument();
     });

@@ -31,7 +31,13 @@ export function setupFieldSearchValuesEndpoints<T>(
   result: T[] = [],
 ) {
   fetchMock.get(
-    `http://localhost/api/field/${fieldId}/search/${fieldId}?value=${searchValue}&limit=100`,
+    {
+      url: `path:/api/field/${fieldId}/search/${fieldId}`,
+      query: {
+        value: searchValue,
+        limit: 100, // corresponds to MAX_SEARCH_RESULTS in FieldValuesWidget
+      },
+    },
     {
       body: result,
     },
